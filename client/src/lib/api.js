@@ -65,8 +65,13 @@ export function getNetwork() {
     return apiRequest('/network');
 }
 
-export function getLogs(page = 1) {
-    return apiRequest(`/logs?page=${page}`);
+export function getLogs(page = 1, filters = {}) {
+    const params = new URLSearchParams({ page });
+    if (filters.action) params.append('action', filters.action);
+    if (filters.search) params.append('search', filters.search);
+    if (filters.startDate) params.append('startDate', filters.startDate);
+    if (filters.endDate) params.append('endDate', filters.endDate);
+    return apiRequest(`/logs?${params.toString()}`);
 }
 
 export function getUsers() {
@@ -95,6 +100,10 @@ export function deleteUser(id) {
 
 export function getProxmoxUsers() {
     return apiRequest('/proxmox-users');
+}
+
+export function getProxmoxActiveUsers() {
+    return apiRequest('/proxmox-users/active');
 }
 
 export function getProxmoxUser(userid) {

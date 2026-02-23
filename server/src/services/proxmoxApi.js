@@ -166,6 +166,18 @@ class ProxmoxApi {
         return this.request(`/nodes/${this.nodeName}/tasks?limit=${limit}`);
     }
 
+    async getClusterLog(max = 500) {
+        // Cluster log includes authentication events, login/logout
+        return this.request(`/cluster/log?max=${max}`);
+    }
+
+    async getNodeSyslog(limit = 500, since = null) {
+        // System log includes pvedaemon auth messages
+        let path = `/nodes/${this.nodeName}/syslog?limit=${limit}`;
+        if (since) path += `&since=${encodeURIComponent(since)}`;
+        return this.request(path);
+    }
+
     async updateACL(aclData) {
         // aclData: { path, users, roles, propagate }
         // path: e.g. "/" (full access), "/vms/100" (specific VM)

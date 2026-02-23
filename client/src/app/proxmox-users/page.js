@@ -6,7 +6,8 @@ import { useWebSocket } from '../../hooks/useWebSocket';
 import {
     getProxmoxUsers, createProxmoxUser, deleteProxmoxUser,
     updateProxmoxUser, getProxmoxGroups, getProxmoxRoles,
-    getProxmoxACL, assignProxmoxRole, removeProxmoxACL
+    getProxmoxACL, assignProxmoxRole, removeProxmoxACL,
+    getProxmoxActiveUsers
 } from '../../lib/api';
 import Sidebar from '../../components/Sidebar';
 import TopBar from '../../components/TopBar';
@@ -34,6 +35,8 @@ export default function ProxmoxUsersPage() {
     const [acl, setAcl] = useState([]);
     const [showRoleForm, setShowRoleForm] = useState(null); // userid to assign role
     const [roleFormData, setRoleFormData] = useState({ role: '', path: '/', propagate: true });
+    const [activeUsersData, setActiveUsersData] = useState(null);
+    const [showActivePanel, setShowActivePanel] = useState(false);
 
     useEffect(() => {
         if (!loading && !user) router.push('/login');
@@ -46,16 +49,18 @@ export default function ProxmoxUsersPage() {
     async function fetchData() {
         setLoadingData(true);
         try {
-            const [usersData, groupsData, rolesData, aclData] = await Promise.all([
+            const [usersData, groupsData, rolesData, aclData, activeData] = await Promise.all([
                 getProxmoxUsers().catch(() => []),
                 getProxmoxGroups().catch(() => []),
                 getProxmoxRoles().catch(() => []),
                 getProxmoxACL().catch(() => []),
+                getProxmoxActiveUsers().catch(() => null),
             ]);
             setPveUsers(usersData || []);
             setGroups(groupsData || []);
             setRoles(rolesData || []);
             setAcl(aclData || []);
+            setActiveUsersData(activeData);
         } catch (err) {
             setMessage(`Error: ${err.message}`);
         } finally {
@@ -262,11 +267,11 @@ export default function ProxmoxUsersPage() {
                             <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 8 }}>Enabled</span>
                         </div>
                         <div style={{
-                            padding: '12px 20px', background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
+                            padding: '12px 20px', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)',
                             borderRadius: 10, backdropFilter: 'blur(12px)',
                         }}>
                             <span style={{ fontSize: 22, fontWeight: 700, color: '#ef4444' }}>{pveUsers.filter(u => u.enable === 0).length}</span>
-                            <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 8 }}>Disabled</span>
+                            <span style={{ fontSize: 12, color: '#ef4444', marginLeft: 8 }}>🔴 Disabled</span>
                         </div>
                         <div style={{
                             padding: '12px 20px', background: 'var(--glass-bg)', border: '1px solid var(--glass-border)',
@@ -282,7 +287,171 @@ export default function ProxmoxUsersPage() {
                             <span style={{ fontSize: 22, fontWeight: 700, color: '#f59e0b' }}>{roles.length}</span>
                             <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 8 }}>Roles</span>
                         </div>
+                        {activeUsersData?.summary && (
+                            <>
+                                <div style={{
+                                    padding: '12px 20px', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)',
+                                    borderRadius: 10, backdropFilter: 'blur(12px)', cursor: 'pointer',
+                                }} onClick={() => setShowActivePanel(!showActivePanel)}>
+                                    <span style={{ fontSize: 22, fontWeight: 700, color: '#10b981' }}>
+                                        {activeUsersData.summary.currentlyActive}
+                                    </span>
+                                    <span style={{ fontSize: 12, color: '#10b981', marginLeft: 8 }}>🟢 Online Now</span>
+                                </div>
+                                <div style={{
+                                    padding: '12px 20px', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)',
+                                    borderRadius: 10, backdropFilter: 'blur(12px)', cursor: 'pointer',
+                                }} onClick={() => setShowActivePanel(!showActivePanel)}>
+                                    <span style={{ fontSize: 22, fontWeight: 700, color: '#3b82f6' }}>
+                                        {activeUsersData.summary.activeLastHour}
+                                    </span>
+                                    <span style={{ fontSize: 12, color: '#3b82f6', marginLeft: 8 }}>Active (1h)</span>
+                                </div>
+                                <div style={{
+                                    padding: '12px 20px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)',
+                                    borderRadius: 10, backdropFilter: 'blur(12px)', cursor: 'pointer',
+                                }} onClick={() => setShowActivePanel(!showActivePanel)}>
+                                    <span style={{ fontSize: 22, fontWeight: 700, color: '#f59e0b' }}>
+                                        {activeUsersData.summary.activeLast24h}
+                                    </span>
+                                    <span style={{ fontSize: 12, color: '#f59e0b', marginLeft: 8 }}>Active (24h)</span>
+                                </div>
+                            </>
+                        )}
                     </div>
+
+                    {/* Active Users Panel */}
+                    {showActivePanel && activeUsersData?.activeUsers && (
+                        <div className="card fade-in-up" style={{ marginBottom: 24, border: '1px solid rgba(16,185,129,0.2)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                                <h3 className="card-title" style={{ margin: 0 }}>
+                                    🟢 Active Proxmox Users — Real-time Activity
+                                </h3>
+                                <button className="btn btn-sm btn-secondary" onClick={() => setShowActivePanel(false)} style={{ fontSize: 11 }}>
+                                    ✕ Close
+                                </button>
+                            </div>
+                            <div className="table-container" style={{ maxHeight: 400, overflow: 'auto' }}>
+                                <table className="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Status</th>
+                                            <th>User ID</th>
+                                            <th>Last Activity</th>
+                                            <th>Source</th>
+                                            <th>Last Node</th>
+                                            <th>Last Task</th>
+                                            <th>Tasks / Logins</th>
+                                            <th>Recent Tasks</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {activeUsersData.activeUsers.map((au) => {
+                                            const statusColor = (au.isCurrentlyActive || au.isLoggedIn) ? '#10b981'
+                                                : au.isRecentlyActive ? '#3b82f6'
+                                                : au.isActiveToday ? '#f59e0b' : '#6b7280';
+                                            const statusLabel = (au.isCurrentlyActive || au.isLoggedIn) ? '🟢 Online'
+                                                : au.isRecentlyActive ? '🔵 Recent'
+                                                : au.isActiveToday ? '🟡 Today' : '⚪ Inactive';
+                                            
+                                            function timeAgo(isoStr) {
+                                                if (!isoStr) return '-';
+                                                const diff = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000);
+                                                if (diff < 60) return `${diff}s ago`;
+                                                if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+                                                if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+                                                return `${Math.floor(diff / 86400)}d ago`;
+                                            }
+
+                                            return (
+                                                <tr key={au.userid}>
+                                                    <td>
+                                                        <span style={{
+                                                            padding: '3px 10px', borderRadius: 4, fontSize: 11, fontWeight: 600,
+                                                            background: `${statusColor}15`, color: statusColor,
+                                                            border: `1px solid ${statusColor}30`,
+                                                            whiteSpace: 'nowrap',
+                                                        }}>
+                                                            {statusLabel}
+                                                        </span>
+                                                    </td>
+                                                    <td><span className="vm-name">{au.userid}</span></td>
+                                                    <td style={{ fontSize: 12 }}>
+                                                        <span title={au.lastActivityFormatted}>
+                                                            {timeAgo(au.lastActivityFormatted)}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span style={{
+                                                            padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600,
+                                                            background: au.activitySource === 'login' || au.activitySource === 'syslog'
+                                                                ? 'rgba(16,185,129,0.1)' : 'rgba(245,158,11,0.1)',
+                                                            color: au.activitySource === 'login' || au.activitySource === 'syslog'
+                                                                ? '#10b981' : '#f59e0b',
+                                                            border: `1px solid ${au.activitySource === 'login' || au.activitySource === 'syslog'
+                                                                ? 'rgba(16,185,129,0.2)' : 'rgba(245,158,11,0.2)'}`,
+                                                        }}>
+                                                            {au.activitySource === 'login' ? '🔑 Login' 
+                                                                : au.activitySource === 'syslog' ? '🔑 Auth'
+                                                                : au.activitySource === 'task' ? '⚙️ Task' : '-'}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <span style={{
+                                                            padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600,
+                                                            background: 'rgba(139,92,246,0.1)', color: '#8b5cf6',
+                                                            border: '1px solid rgba(139,92,246,0.2)',
+                                                        }}>
+                                                            {au.lastNode || '-'}
+                                                        </span>
+                                                    </td>
+                                                    <td style={{ fontSize: 12 }}>{au.lastTaskType || '-'}</td>
+                                                    <td style={{ fontSize: 12 }}>
+                                                        <span style={{ fontWeight: 600 }}>{au.taskCount}</span>
+                                                        <span style={{ color: 'var(--text-muted)', margin: '0 3px' }}>/</span>
+                                                        <span style={{ fontWeight: 600, color: '#10b981' }}>{au.loginCount || 0}</span>
+                                                    </td>
+                                                    <td>
+                                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                                                            {au.recentTasks.slice(0, 3).map((t, i) => (
+                                                                <span key={i} style={{
+                                                                    padding: '1px 6px', borderRadius: 3, fontSize: 9, fontWeight: 600,
+                                                                    background: t.status === 'OK' ? 'rgba(16,185,129,0.1)'
+                                                                        : t.status === 'running' ? 'rgba(59,130,246,0.1)'
+                                                                        : 'rgba(239,68,68,0.1)',
+                                                                    color: t.status === 'OK' ? '#10b981'
+                                                                        : t.status === 'running' ? '#3b82f6'
+                                                                        : '#ef4444',
+                                                                    border: `1px solid ${t.status === 'OK' ? 'rgba(16,185,129,0.2)'
+                                                                        : t.status === 'running' ? 'rgba(59,130,246,0.2)'
+                                                                        : 'rgba(239,68,68,0.2)'}`,
+                                                                }}>
+                                                                    {t.type} {t.status === 'running' ? '⏳' : t.status === 'OK' ? '✓' : '✕'}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                        {activeUsersData.activeUsers.length === 0 && (
+                                            <tr>
+                                                <td colSpan={8} style={{ textAlign: 'center', padding: 30, color: 'var(--text-muted)' }}>
+                                                    No recent user activity found
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div style={{ marginTop: 10, fontSize: 11, color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
+                                <span>
+                                    🟢 Online = logged in / running tasks | 🔵 Recent = active within 1 hour | 🟡 Today = active within 24 hours
+                                </span>
+                                <span>Last updated: {new Date(activeUsersData.timestamp).toLocaleTimeString()}</span>
+                            </div>
+                        </div>
+                    )}
 
                     {message && (
                         <div style={{
@@ -386,6 +555,7 @@ export default function ProxmoxUsersPage() {
                                         <th>Name</th>
                                         <th>Email</th>
                                         <th>Realm</th>
+                                        <th>Last Active</th>
                                         <th>Roles / Permissions</th>
                                         <th>Status</th>
                                         <th>Expiry</th>
@@ -401,14 +571,39 @@ export default function ProxmoxUsersPage() {
                                         const displayName = [u.firstname, u.lastname].filter(Boolean).join(' ') || '-';
                                         const userRoles = getUserACL(u.userid);
 
+                                        // Get active status from activeUsersData
+                                        const activeInfo = activeUsersData?.activeUsers?.find(a => a.userid === u.userid);
+                                        const activityStatus = activeInfo
+                                            ? (activeInfo.isCurrentlyActive || activeInfo.isLoggedIn) ? { label: '🟢 Online', color: '#10b981' }
+                                                : activeInfo.isRecentlyActive ? { label: '🔵 Recent', color: '#3b82f6' }
+                                                : activeInfo.isActiveToday ? { label: '🟡 Today', color: '#f59e0b' }
+                                                : { label: '⚪ Inactive', color: '#6b7280' }
+                                            : { label: '⚪ No Activity', color: '#6b7280' };
+
+                                        function timeAgoShort(isoStr) {
+                                            if (!isoStr) return '-';
+                                            const diff = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000);
+                                            if (diff < 60) return `${diff}s ago`;
+                                            if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+                                            if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+                                            return `${Math.floor(diff / 86400)}d ago`;
+                                        }
+
                                         return (
                                             <>
-                                                <tr key={u.userid} style={{ opacity: isEnabled ? 1 : 0.5 }}>
+                                                <tr key={u.userid} style={{
+                                                    background: isEnabled ? 'transparent' : 'rgba(239, 68, 68, 0.04)',
+                                                    borderLeft: isEnabled ? 'none' : '3px solid rgba(239, 68, 68, 0.4)',
+                                                }}>
                                                     <td>
-                                                        <span className="vm-name">{u.userid}</span>
+                                                        <span className="vm-name" style={{
+                                                            textDecoration: isEnabled ? 'none' : 'line-through',
+                                                            opacity: isEnabled ? 1 : 0.6,
+                                                            color: isEnabled ? undefined : '#9ca3af',
+                                                        }}>{u.userid}</span>
                                                     </td>
-                                                    <td>{displayName}</td>
-                                                    <td style={{ fontSize: 12 }}>{u.email || '-'}</td>
+                                                    <td style={{ color: isEnabled ? undefined : '#6b7280', opacity: isEnabled ? 1 : 0.7 }}>{displayName}</td>
+                                                    <td style={{ fontSize: 12, color: isEnabled ? undefined : '#6b7280', opacity: isEnabled ? 1 : 0.7 }}>{u.email || '-'}</td>
                                                     <td>
                                                         <span style={{
                                                             padding: '3px 10px', borderRadius: 4, fontSize: 11, fontWeight: 600,
@@ -417,6 +612,26 @@ export default function ProxmoxUsersPage() {
                                                         }}>
                                                             {realm}
                                                         </span>
+                                                    </td>
+                                                    <td>
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                                            <span style={{
+                                                                padding: '2px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600,
+                                                                background: `${activityStatus.color}15`,
+                                                                color: activityStatus.color,
+                                                                border: `1px solid ${activityStatus.color}30`,
+                                                                display: 'inline-block', width: 'fit-content',
+                                                            }}>
+                                                                {activityStatus.label}
+                                                            </span>
+                                                            {activeInfo?.lastActivityFormatted && (
+                                                                <span style={{ fontSize: 10, color: 'var(--text-muted)' }}
+                                                                    title={activeInfo.lastActivityFormatted}>
+                                                                    {timeAgoShort(activeInfo.lastActivityFormatted)}
+                                                                    {activeInfo.lastNode ? ` · ${activeInfo.lastNode}` : ''}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                     <td>
                                                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center' }}>
@@ -458,14 +673,30 @@ export default function ProxmoxUsersPage() {
                                                         </div>
                                                     </td>
                                                     <td>
-                                                        <span style={{
-                                                            padding: '3px 10px', borderRadius: 4, fontSize: 11, fontWeight: 600,
-                                                            background: isEnabled ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
-                                                            color: isEnabled ? '#10b981' : '#ef4444',
-                                                            border: `1px solid ${isEnabled ? 'rgba(16,185,129,0.2)' : 'rgba(239,68,68,0.2)'}`,
-                                                        }}>
-                                                            {isEnabled ? 'Enabled' : 'Disabled'}
-                                                        </span>
+                                                        {isEnabled ? (
+                                                            <span style={{
+                                                                padding: '3px 10px', borderRadius: 4, fontSize: 11, fontWeight: 600,
+                                                                background: 'rgba(16,185,129,0.1)', color: '#10b981',
+                                                                border: '1px solid rgba(16,185,129,0.2)',
+                                                            }}>
+                                                                ● Enabled
+                                                            </span>
+                                                        ) : (
+                                                            <span style={{
+                                                                padding: '3px 10px', borderRadius: 4, fontSize: 11, fontWeight: 700,
+                                                                background: 'rgba(239, 68, 68, 0.15)', color: '#f87171',
+                                                                border: '1px solid rgba(239, 68, 68, 0.35)',
+                                                                display: 'inline-flex', alignItems: 'center', gap: 5,
+                                                                letterSpacing: '0.5px', textTransform: 'uppercase',
+                                                            }}>
+                                                                <span style={{
+                                                                    width: 7, height: 7, borderRadius: '50%',
+                                                                    background: '#ef4444', display: 'inline-block',
+                                                                    boxShadow: '0 0 6px rgba(239,68,68,0.6)',
+                                                                }}></span>
+                                                                Disabled
+                                                            </span>
+                                                        )}
                                                     </td>
                                                     <td style={{ fontSize: 12 }}>{formatExpiry(u.expire)}</td>
                                                     {canManage && (
@@ -497,7 +728,7 @@ export default function ProxmoxUsersPage() {
                                                 {/* Inline Role Assignment Form */}
                                                 {showRoleForm === u.userid && canManage && (
                                                     <tr key={`${u.userid}-role`}>
-                                                        <td colSpan={canManage ? 8 : 7} style={{ padding: '12px 16px', background: 'rgba(16,185,129,0.03)' }}>
+                                                        <td colSpan={canManage ? 9 : 8} style={{ padding: '12px 16px', background: 'rgba(16,185,129,0.03)' }}>
                                                             <form onSubmit={handleAssignRole} style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
                                                                 <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 600 }}>
                                                                     🛡️ Assign role to <strong style={{ color: 'var(--accent-cyan)' }}>{u.userid}</strong>:
@@ -545,7 +776,7 @@ export default function ProxmoxUsersPage() {
                                     })}
                                     {pveUsers.length === 0 && (
                                         <tr>
-                                            <td colSpan={canManage ? 8 : 7} style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
+                                            <td colSpan={canManage ? 9 : 8} style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
                                                 No Proxmox users found
                                             </td>
                                         </tr>
