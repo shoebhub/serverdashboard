@@ -62,7 +62,7 @@ export default function LogsPage() {
                                         try { details = JSON.parse(log.details || '{}'); } catch { }
                                         return (
                                             <tr key={log.id}>
-                                                <td style={{ fontSize: 12 }}>{new Date(log.timestamp).toLocaleString()}</td>
+                                                <td style={{ fontSize: 12 }}>{new Date(log.timestamp.endsWith('Z') ? log.timestamp : log.timestamp + 'Z').toLocaleString()}</td>
                                                 <td><span className="vm-name">{log.username || 'System'}</span></td>
                                                 <td>{log.action}</td>
                                                 <td style={{ fontSize: 12, fontFamily: "'Courier New', monospace" }}>{log.resource}</td>

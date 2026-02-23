@@ -1,4 +1,4 @@
-export const APP_NAME = 'Server Dashboard';
+export const APP_NAME = 'Barabd Server Dashboard';
 export const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:4000';
 
 export const NAV_ITEMS = [
@@ -8,6 +8,7 @@ export const NAV_ITEMS = [
     { name: 'Network', path: '/network', icon: '🌐' },
     { name: 'Security Logs', path: '/logs', icon: '🔒' },
     { name: 'User Management', path: '/users', icon: '👥' },
+    { name: 'Proxmox Users', path: '/proxmox-users', icon: '🛡️' },
 ];
 
 export function formatBytes(bytes) {

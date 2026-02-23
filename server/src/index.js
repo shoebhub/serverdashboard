@@ -19,13 +19,14 @@ const storageRoutes = require('./routes/storage');
 const networkRoutes = require('./routes/network');
 const logsRoutes = require('./routes/logs');
 const usersRoutes = require('./routes/users');
+const proxmoxUsersRoutes = require('./routes/proxmoxUsers');
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
 // Middleware
 app.use(cors({
-    origin: ['http://localhost:3000', 'http://127.0.0.1:3000'],
+    origin: ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:3001', 'http://127.0.0.1:3001'],
     credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -88,6 +89,7 @@ app.use('/api/storage', storageRoutes);
 app.use('/api/network', networkRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/proxmox-users', proxmoxUsersRoutes);
 
 // 404 handler
 app.use((req, res) => {

@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { vmAction } from '../lib/api';
+import { vmAction, deleteVM } from '../lib/api';
 import StatusBadge from './StatusBadge';
 import { formatBytes } from '../lib/constants';
 
@@ -22,6 +22,30 @@ export default function VMTable({ vms, permissions }) {
             const result = await vmAction(vmid, action);
             setMessage(result.message || `${action} command sent to VM ${vmid}`);
             setTimeout(() => setMessage(''), 3000);
+        } catch (err) {
+            setMessage(`Error: ${err.message}`);
+        } finally {
+            setActionLoading(null);
+        }
+    }
+
+    async function handleDelete(vmid, vmName) {
+        if (!canPerformActions) {
+            setMessage('Error: You do not have permission to delete VMs.');
+            setTimeout(() => setMessage(''), 3000);
+            return;
+        }
+
+        const confirmed = window.confirm(`⚠️ WARNING: Are you sure you want to PERMANENTLY DELETE VM "${vmName}" (#${vmid})?\n\nThis action CANNOT be undone and will delete all disks and data.`);
+
+        if (!confirmed) return;
+
+        setActionLoading(`${vmid}-delete`);
+        setMessage('');
+        try {
+            const result = await deleteVM(vmid);
+            setMessage(result.message || `VM ${vmid} deleted successfully.`);
+            setTimeout(() => setMessage(''), 5000);
         } catch (err) {
             setMessage(`Error: ${err.message}`);
         } finally {
@@ -104,8 +128,22 @@ export default function VMTable({ vms, permissions }) {
                                             >
                                                 {actionLoading === `${vm.vmid}-reset` ? '...' : '🔄 Restart'}
                                             </button>
+                                            <button
+                                                className="btn btn-sm btn-suspend"
+                                                onClick={() => handleAction(vm.vmid, 'suspend')}
+                                                disabled={actionLoading === `${vm.vmid}-suspend`}
+                                            >
+                                                {actionLoading === `${vm.vmid}-suspend` ? '...' : '⏸ Suspend'}
+                                            </button>
                                             <button className="btn btn-sm btn-console">
                                                 🖥 Console
+                                            </button>
+                                            <button
+                                                className="btn btn-sm btn-delete"
+                                                onClick={() => handleDelete(vm.vmid, vm.name)}
+                                                disabled={actionLoading === `${vm.vmid}-delete`}
+                                            >
+                                                {actionLoading === `${vm.vmid}-delete` ? '...' : '🗑 Delete'}
                                             </button>
                                         </div>
                                     </td>

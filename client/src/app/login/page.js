@@ -29,8 +29,8 @@ export default function LoginPage() {
         <div className="login-page">
             <div className="login-card">
                 <div className="login-logo">
-                    <div className="login-logo-icon">A</div>
-                    <h1 className="login-title">Server Dashboard</h1>
+                    <img src="/logo.png" alt="BARA Logo" className="login-logo-img" />
+                    <h1 className="login-title">Barabd Server Dashboard</h1>
                     <p className="login-subtitle">Proxmox Infrastructure Management</p>
                 </div>
 

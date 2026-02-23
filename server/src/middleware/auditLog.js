@@ -8,7 +8,7 @@ function auditLogMiddleware(req, res, next) {
             try {
                 const db = getDb();
                 db.run(
-                    'INSERT INTO audit_logs (user_id, action, resource, details, ip_address) VALUES (?, ?, ?, ?, ?)',
+                    'INSERT INTO audit_logs (user_id, action, resource, details, ip_address, timestamp) VALUES (?, ?, ?, ?, ?, ?)',
                     [
                         req.user ? req.user.id : null,
                         `${req.method} ${req.originalUrl}`,
@@ -19,6 +19,7 @@ function auditLogMiddleware(req, res, next) {
                             userAgent: req.headers['user-agent'],
                         }),
                         req.ip || req.connection.remoteAddress,
+                        new Date().toISOString(),
                     ]
                 );
                 saveDb();

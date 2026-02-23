@@ -185,9 +185,97 @@ async function fetchAllVMs() {
         const api = new ProxmoxApi(node);
         const vms = await api.getVMs();
         if (vms) {
-            vms.forEach((vm) => {
-                allVMs.push({ ...vm, node: node.name });
-            });
+            // Fetch IP and OS info for each VM in parallel
+            const enriched = await Promise.all(
+                vms.map(async (vm) => {
+                    const vmData = { ...vm, node: node.name, ipAddress: null, os: null };
+
+                    // Only query guest agent for running VMs
+                    if (vm.status === 'running') {
+                        try {
+                            // Fetch network interfaces and OS info in parallel
+                            const [netResult, osResult, configResult] = await Promise.all([
+                                api.getVMAgentNetwork(vm.vmid).catch(() => null),
+                                api.getVMAgentOSInfo(vm.vmid).catch(() => null),
+                                api.getVMConfig(vm.vmid).catch(() => null),
+                            ]);
+
+                            // Extract IP address (skip loopback, pick first non-loopback IPv4)
+                            if (netResult && netResult.result) {
+                                for (const iface of netResult.result) {
+                                    if (iface.name === 'lo') continue;
+                                    const ipEntry = iface['ip-addresses']?.find(
+                                        (ip) => ip['ip-address-type'] === 'ipv4'
+                                    );
+                                    if (ipEntry) {
+                                        vmData.ipAddress = ipEntry['ip-address'];
+                                        break;
+                                    }
+                                }
+                            }
+
+                            // Extract OS info from guest agent
+                            if (osResult && osResult.result) {
+                                const r = osResult.result;
+                                vmData.os = r['pretty-name'] || r.name || null;
+                            }
+
+                            // Fallback: get OS type from VM config
+                            if (!vmData.os && configResult) {
+                                const ostype = configResult.ostype;
+                                if (ostype) {
+                                    const osMap = {
+                                        l26: 'Linux (2.6+)',
+                                        l24: 'Linux (2.4)',
+                                        win11: 'Windows 11',
+                                        win10: 'Windows 10',
+                                        win8: 'Windows 8',
+                                        win7: 'Windows 7',
+                                        w2k8: 'Windows Server 2008',
+                                        w2k19: 'Windows Server 2019',
+                                        w2k22: 'Windows Server 2022',
+                                        wvista: 'Windows Vista',
+                                        wxp: 'Windows XP',
+                                        solaris: 'Solaris',
+                                        other: 'Other',
+                                    };
+                                    vmData.os = osMap[ostype] || ostype;
+                                }
+                            }
+                        } catch (err) {
+                            // Guest agent may not be installed - silently continue
+                        }
+                    } else {
+                        // For stopped VMs, try to get OS from config
+                        try {
+                            const config = await api.getVMConfig(vm.vmid);
+                            if (config?.ostype) {
+                                const osMap = {
+                                    l26: 'Linux (2.6+)',
+                                    l24: 'Linux (2.4)',
+                                    win11: 'Windows 11',
+                                    win10: 'Windows 10',
+                                    win8: 'Windows 8',
+                                    win7: 'Windows 7',
+                                    w2k8: 'Windows Server 2008',
+                                    w2k19: 'Windows Server 2019',
+                                    w2k22: 'Windows Server 2022',
+                                    wvista: 'Windows Vista',
+                                    wxp: 'Windows XP',
+                                    solaris: 'Solaris',
+                                    other: 'Other',
+                                };
+                                vmData.os = osMap[config.ostype] || config.ostype;
+                            }
+                        } catch (err) {
+                            // Silently continue
+                        }
+                    }
+
+                    return vmData;
+                })
+            );
+            allVMs.push(...enriched);
         }
     }
     return allVMs;
@@ -207,7 +295,12 @@ async function fetchAllStorage() {
         const storage = await api.getStorage();
         if (storage) {
             storage.forEach((s) => {
-                allStorage.push({ ...s, node: node.name });
+                // Use Proxmox's actual active status (1 = mounted, 0 = disabled/not mounted)
+                allStorage.push({
+                    ...s,
+                    node: node.name,
+                    active: s.active === 1,
+                });
             });
         }
     }

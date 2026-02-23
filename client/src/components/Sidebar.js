@@ -9,7 +9,7 @@ export default function Sidebar({ connected }) {
     return (
         <aside className="sidebar">
             <div className="sidebar-brand">
-                <div className="sidebar-brand-icon">A</div>
+                <img src="/logo.png" alt="BARA Logo" className="sidebar-brand-logo" />
                 <div>
                     <div className="sidebar-brand-text">{APP_NAME}</div>
                     <div className="sidebar-brand-sub">Infrastructure Control</div>
@@ -27,6 +27,15 @@ export default function Sidebar({ connected }) {
                         <span>{item.name}</span>
                     </Link>
                 ))}
+                <a
+                    href="https://authentik.barabdonline.xyz"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="nav-item nav-item-external"
+                >
+                    <span className="nav-icon">🔑</span>
+                    <span>Authentik</span>
+                </a>
             </nav>
 
             <div className="sidebar-footer">
