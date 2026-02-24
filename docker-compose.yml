@@ -27,8 +27,9 @@ services:
     container_name: proxmox-dashboard-client
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "3001:3001"
     environment:
+      - PORT=3001
       - BACKEND_URL=http://server:4000
       - NEXT_PUBLIC_API_URL=http://localhost:4000/api
     depends_on:
@@ -42,7 +43,7 @@ services:
     container_name: proxmox-dashboard-prometheus
     restart: unless-stopped
     ports:
-      - "9090:9090"
+      - "4001:9090"
     volumes:
       - ./prometheus/prometheus-docker.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
